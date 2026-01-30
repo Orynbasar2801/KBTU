@@ -1,0 +1,5 @@
+print("Hello, World!")
+print("Orynbasar")
+print(1234)
+print(10 + 2)
+print("Orik" * 2)
