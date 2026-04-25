@@ -1,132 +1,121 @@
 import pygame
+import random
 
 pygame.init()
 
 # ---------------- НАСТРОЙКИ ----------------
-WIDTH, HEIGHT = 900, 600
-TOOLBAR_WIDTH = 200
-DRAW_WIDTH = WIDTH - TOOLBAR_WIDTH
-
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Paint with UI")
-
-clock = pygame.time.Clock()
-font = pygame.font.SysFont(None, 24)
+WIDTH = 400
+HEIGHT = 400
+CELL_SIZE = 20
 
 # Цвета
 WHITE = (255, 255, 255)
-GRAY = (200, 200, 200)
-DARK = (100, 100, 100)
+GREEN = (0, 200, 0)
+RED = (200, 0, 0)
 BLACK = (0, 0, 0)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)
 
-colors = [BLACK, RED, GREEN, BLUE]
-current_color = BLACK
+# Окно
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Snake Game")
 
-# Режимы
-mode = "brush"
+clock = pygame.time.Clock()
+font = pygame.font.SysFont(None, 30)
 
-brush_size = 5
+# ---------------- ЗМЕЙКА ----------------
+snake = [(100, 100), (80, 100), (60, 100)]
+direction = (20, 0)
 
-# Холст
-canvas = pygame.Surface((DRAW_WIDTH, HEIGHT))
-canvas.fill(WHITE)
+# Флаг для ограничения поворотов
+change_direction = False
 
-drawing = False
-last_pos = None
+# ---------------- ЕДА ----------------
+def generate_food():
+    while True:
+        x = random.randrange(0, WIDTH, CELL_SIZE)
+        y = random.randrange(0, HEIGHT, CELL_SIZE)
+        
+        # Не спавнится на змейке
+        if (x, y) not in snake:
+            return (x, y)
 
-# ---------------- КНОПКИ ----------------
-def draw_button(rect, text, active):
-    pygame.draw.rect(screen, DARK if active else GRAY, rect)
-    label = font.render(text, True, BLACK)
-    screen.blit(label, (rect.x + 10, rect.y + 10))
+food = generate_food()
 
-# позиции кнопок
-buttons = {
-    "brush": pygame.Rect(DRAW_WIDTH + 20, 50, 160, 40),
-    "rect": pygame.Rect(DRAW_WIDTH + 20, 100, 160, 40),
-    "circle": pygame.Rect(DRAW_WIDTH + 20, 150, 160, 40),
-    "eraser": pygame.Rect(DRAW_WIDTH + 20, 200, 160, 40),
-}
+# ---------------- СЧЕТ ----------------
+score = 0
+level = 1
+speed = 8
 
 # ---------------- GAME LOOP ----------------
 running = True
 while running:
+    change_direction = False  # сброс каждый кадр
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
-        # -------- КЛИК --------
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            mx, my = event.pos
+        # -------- УПРАВЛЕНИЕ WASD --------
+        if event.type == pygame.KEYDOWN and not change_direction:
+            if event.key == pygame.K_w and direction != (0, 20):
+                direction = (0, -20)
+                change_direction = True
 
-            # Проверка кнопок инструментов
-            for tool, rect in buttons.items():
-                if rect.collidepoint(mx, my):
-                    mode = tool
+            elif event.key == pygame.K_s and direction != (0, -20):
+                direction = (0, 20)
+                change_direction = True
 
-            # Проверка палитры
-            for i, color in enumerate(colors):
-                rect = pygame.Rect(DRAW_WIDTH + 20 + i*40, 300, 30, 30)
-                if rect.collidepoint(mx, my):
-                    current_color = color
+            elif event.key == pygame.K_a and direction != (20, 0):
+                direction = (-20, 0)
+                change_direction = True
 
-            # Если клик в зоне рисования
-            if mx < DRAW_WIDTH:
-                drawing = True
-                last_pos = event.pos
+            elif event.key == pygame.K_d and direction != (-20, 0):
+                direction = (20, 0)
+                change_direction = True
 
-                # СРАЗУ рисуем фигуру (по условию)
-                if mode == "rect":
-                    pygame.draw.rect(canvas, current_color,
-                                     (mx, my, 50, 50), 2)
+    # ---------------- ДВИЖЕНИЕ ----------------
+    head_x, head_y = snake[0]
+    new_head = (head_x + direction[0], head_y + direction[1])
+    snake.insert(0, new_head)
 
-                elif mode == "circle":
-                    pygame.draw.circle(canvas, current_color,
-                                       (mx, my), 25, 2)
+    # ---------------- СТОЛКНОВЕНИЕ С ГРАНИЦАМИ ----------------
+    if (new_head[0] < 0 or new_head[0] >= WIDTH or
+        new_head[1] < 0 or new_head[1] >= HEIGHT):
+        running = False
 
-        if event.type == pygame.MOUSEBUTTONUP:
-            drawing = False
+    # ---------------- СТОЛКНОВЕНИЕ С СОБОЙ ----------------
+    if new_head in snake[1:]:
+        running = False
 
-        if event.type == pygame.MOUSEMOTION and drawing:
-            mx, my = event.pos
+    # ---------------- ЕДА ----------------
+    if new_head == food:
+        score += 1
+        food = generate_food()
 
-            if mx < DRAW_WIDTH:
-                if mode == "brush":
-                    pygame.draw.line(canvas, current_color, last_pos, (mx, my), brush_size)
-
-                elif mode == "eraser":
-                    pygame.draw.line(canvas, WHITE, last_pos, (mx, my), brush_size * 2)
-
-                last_pos = (mx, my)
+        # Новый уровень каждые 3 очка
+        if score % 3 == 0:
+            level += 1
+            speed += 2
+    else:
+        snake.pop()
 
     # ---------------- ОТРИСОВКА ----------------
-    screen.fill(GRAY)
+    screen.fill(BLACK)
 
-    # Холст
-    screen.blit(canvas, (0, 0))
+    # Рисуем змейку
+    for segment in snake:
+        pygame.draw.rect(screen, GREEN, (segment[0], segment[1], CELL_SIZE, CELL_SIZE))
 
-    # Правая панель
-    pygame.draw.rect(screen, (220, 220, 220), (DRAW_WIDTH, 0, TOOLBAR_WIDTH, HEIGHT))
+    # Рисуем еду
+    pygame.draw.rect(screen, RED, (food[0], food[1], CELL_SIZE, CELL_SIZE))
 
-    # Кнопки инструментов
-    draw_button(buttons["brush"], "Brush", mode == "brush")
-    draw_button(buttons["rect"], "Rectangle", mode == "rect")
-    draw_button(buttons["circle"], "Circle", mode == "circle")
-    draw_button(buttons["eraser"], "Eraser", mode == "eraser")
+    # Текст
+    score_text = font.render(f"Score: {score}", True, WHITE)
+    level_text = font.render(f"Level: {level}", True, WHITE)
 
-    # Палитра цветов
-    for i, color in enumerate(colors):
-        pygame.draw.rect(screen, color, (DRAW_WIDTH + 20 + i*40, 300, 30, 30))
-
-    # Текущий цвет
-    pygame.draw.rect(screen, current_color, (DRAW_WIDTH + 20, 350, 60, 30))
-    text = font.render("Color", True, BLACK)
-    screen.blit(text, (DRAW_WIDTH + 90, 355))
+    screen.blit(score_text, (10, 10))
+    screen.blit(level_text, (300, 10))
 
     pygame.display.update()
-    clock.tick(60)
+    clock.tick(speed)
 
 pygame.quit()
